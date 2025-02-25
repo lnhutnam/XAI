@@ -9,10 +9,11 @@ using ParameterSchedulers
 model = VGG16(num_features, num_classes)
 
 # Use CPU only
+# device = CUDA.functional() ? gpu : cpu
 device = cpu
 model = model |> device
 
-# Optimizer setup with Flux ADAM
+# Optimizer setup
 optim = Flux.setup(Adam(learning_rate), model)
 
 # Accuracy function
