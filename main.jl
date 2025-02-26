@@ -1,19 +1,36 @@
 include("dataset.jl")
-include("networks.jl") 
+#include("networks.jl") 
 
 using Flux
 using Flux: softmax, onehotbatch, onecold, crossentropy, trainmode!, testmode!, params, setup, update!
-using ParameterSchedulers
+using CUDA
+using Metalhead
+using BSON: @save, @load  # For saving and loading the model
 
-# Define model
-model = VGG16(num_features, num_classes)
+function build_resnet18(num_classes)
+    # Load ResNet-18 from Metalhead (pretrained on ImageNet by default)
+    resnet = ResNet(18; pretrain=true)  # pretrain=false to initialize from scratch
+    
+    # Modify the final fully connected layer for binary classification
+    backbone = resnet.layers[1:end-1]  # All layers except the final classifier
+    classifier = Chain(
+        resnet.layers[end],  # Final pooling layer
+        Flux.flatten,
+        Dense(1000, num_classes)  # Replace 1000 classes with 2
+    )
+    model = Chain(backbone..., classifier)
+    
+    return model
+end
+
+# Initialize model (num_features not needed for ResNet)
+model = build_resnet18(num_classes)
 
 # Use CPU only
-# device = CUDA.functional() ? gpu : cpu
-device = cpu
+device = CUDA.functional() ? gpu : cpu
 model = model |> device
 
-# Optimizer setup
+# Optimizer setup with Flux ADAM
 optim = Flux.setup(Adam(learning_rate), model)
 
 # Accuracy function
@@ -74,3 +91,7 @@ for epoch in 1:num_epochs
 end
 
 println("Total Training Time: $(round((time() - start_time) / 60, digits=2)) min")
+
+model_path = "resnet18_model.bson"
+@save model_path model
+println("Model saved to $model_path")

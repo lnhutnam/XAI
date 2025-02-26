@@ -3,3 +3,4 @@ src_data
 examples
 examples.jl
 Manifest.toml
+nn
